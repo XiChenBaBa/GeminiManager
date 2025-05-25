@@ -44,7 +44,10 @@ python3 main.py
 
 ## 📸 界面预览
 
-*(建议在此插入系统截图或GIF，提升用户体验与直观感受)*
+![image](https://github.com/user-attachments/assets/c230963a-2952-46a2-9cc2-96672efbb4a1)
+
+![image](https://github.com/user-attachments/assets/384f8b7c-b563-4dba-8b5b-8633ea81fac8)
+
 
 ---
 
