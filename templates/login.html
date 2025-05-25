@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员登录 - Gemini API 代理</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="login-body">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1>🤖 Gemini API 代理</h1>
+                <h2>管理员登录</h2>
+            </div>
+            
+            <!-- 消息提示 -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="messages">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            
+            <form method="POST" class="login-form">
+                <div class="form-group">
+                    <label for="password">管理员密码：</label>
+                    <input type="password" id="password" name="password" 
+                           placeholder="请输入管理员密码" required autofocus>
+                </div>
+                
+                <button type="submit" class="login-btn">🔐 登录</button>
+            </form>
+            
+            <div class="login-footer">
+                <p class="login-info">
+                    <strong>默认密码：</strong> admin123<br>
+                    <small>登录后请及时修改密码</small>
+                </p>
+                <p class="login-tips">
+                    💡 <strong>提示：</strong> 会话有效期为1小时
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 自动隐藏消息提示
+        document.addEventListener('DOMContentLoaded', function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    alert.style.opacity = '0';
+                    setTimeout(() => {
+                        alert.remove();
+                    }, 300);
+                }, 5000);
+            });
+        });
+
+        // 回车键提交表单
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.querySelector('.login-form').submit();
+            }
+        });
+    </script>
+</body>
+</html>

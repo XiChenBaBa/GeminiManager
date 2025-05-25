@@ -1,0 +1,10 @@
+{
+  "access_key": "key",
+  "admin_password": "sha256:240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+  "session_timeout": 3600,
+  "api_keys": [],
+  "proxies": [],
+  "key_proxy_mapping": {},
+  "disabled_keys": [],
+  "api_key_stats": {}
+}

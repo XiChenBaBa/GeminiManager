@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini API 代理管理</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部导航栏 -->
+        <div class="navbar">
+            <h1>🤖 Gemini API 代理管理</h1>
+            <div class="navbar-actions">
+                <span class="admin-info">👤 管理员已登录</span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">🚪 登出</a>
+            </div>
+        </div>
+        
+        <!-- 消息提示 -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        <!-- 服务状态 -->
+        <div class="section">
+            <h2>📊 服务状态</h2>
+            <div class="status-grid">
+                <div class="status-item">
+                    <span class="status-label">总API密钥数：</span>
+                    <span class="status-value">{{ config.api_keys|length }}</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">可用密钥数：</span>
+                    <span class="status-value available">{{ (config.api_keys|length) - (config.disabled_keys|length) }}</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">禁用密钥数：</span>
+                    <span class="status-value disabled">{{ config.disabled_keys|length }}</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">代理数量：</span>
+                    <span class="status-value">{{ config.proxies|length }}</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">总调用次数：</span>
+                    <span class="status-value" id="total-calls">计算中...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">成功率：</span>
+                    <span class="status-value" id="success-rate">计算中...</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 安全设置 -->
+        <div class="section">
+            <h2>🔐 安全设置</h2>
+            
+            <!-- 访问密钥设置 -->
+            <div class="security-item">
+                <h3>API访问密钥</h3>
+                <form method="POST" action="{{ url_for('set_access_key') }}">
+                    <div class="form-group">
+                        <input type="text" name="access_key" placeholder="输入新的访问密钥" 
+                               value="{{ config.access_key }}" required>
+                        <button type="submit">更新访问密钥</button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- 管理员密码设置 -->
+            <div class="security-item">
+                <h3>管理员密码</h3>
+                <form method="POST" action="{{ url_for('set_admin_password') }}">
+                    <div class="form-group">
+                        <input type="password" name="new_password" placeholder="输入新密码（至少6位）" required>
+                        <input type="password" name="confirm_password" placeholder="确认新密码" required>
+                        <button type="submit">更新密码</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- API密钥管理 -->
+        <div class="section">
+            <h2>🔐 API密钥管理</h2>
+            
+            <!-- 添加API密钥 -->
+            <form method="POST" action="{{ url_for('add_api_key') }}">
+                <div class="form-group">
+                    <input type="text" name="api_key" placeholder="输入Gemini API密钥" required>
+                    <button type="submit">添加API密钥</button>
+                </div>
+            </form>
+            
+            <!-- API密钥列表 -->
+            <div class="key-list">
+                <h3>当前API密钥列表</h3>
+                {% if config.api_keys %}
+                    {% for key in config.api_keys %}
+                        {% set stats = config.api_key_stats.get(key, {'call_count': 0, 'success_count': 0, 'error_count': 0, 'last_used': None}) %}
+                        <div class="key-item {% if key in config.disabled_keys %}disabled{% endif %}">
+                            <div class="key-info">
+                                <span class="key-text" 
+                                      title="完整密钥: {{ key }}"
+                                      data-full-key="{{ key }}">{{ key[:20] }}...</span>
+                                <div class="key-status-row">
+                                    <span class="key-status">
+                                        {% if key in config.disabled_keys %}
+                                            <span class="status-disabled">❌ 已禁用 (API密钥无效)</span>
+                                        {% else %}
+                                            <span class="status-active">✅ 可用</span>
+                                        {% endif %}
+                                    </span>
+                                    <span class="call-stats">
+                                        📞 调用: <strong>{{ stats.call_count }}</strong> 次
+                                        {% if stats.call_count > 0 %}
+                                            (成功: <span class="success-count">{{ stats.success_count }}</span>, 
+                                             失败: <span class="error-count">{{ stats.error_count }}</span>,
+                                             成功率: <span class="success-rate">{{ "%.1f"|format((stats.success_count / stats.call_count * 100) if stats.call_count > 0 else 0) }}%</span>)
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="key-details">
+                                    {% if key in config.key_proxy_mapping %}
+                                        <span class="proxy-info">🔗 代理: {{ config.key_proxy_mapping[key] }}</span>
+                                    {% else %}
+                                        <span class="proxy-info">🌐 直连</span>
+                                    {% endif %}
+                                    {% if stats.last_used %}
+                                        <span class="last-used">🕒 最后使用: {{ stats.last_used[:19].replace('T', ' ') }}</span>
+                                    {% else %}
+                                        <span class="last-used">🕒 从未使用</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="key-actions">
+                                <!-- 测试按钮 -->
+                                <form method="POST" action="{{ url_for('test_api_key') }}" style="display:inline;">
+                                    <input type="hidden" name="api_key" value="{{ key }}">
+                                    <button type="submit" class="btn-test" title="测试API密钥">🧪 测试</button>
+                                </form>
+                                
+                                <!-- 重置统计按钮 -->
+                                <form method="POST" action="{{ url_for('reset_stats') }}" style="display:inline;">
+                                    <input type="hidden" name="api_key" value="{{ key }}">
+                                    <button type="submit" class="btn-info" title="重置统计信息"
+                                            onclick="return confirm('确定要重置这个API密钥的统计信息吗？')">📊 重置</button>
+                                </form>
+                                
+                                <!-- 删除按钮 -->
+                                <form method="POST" action="{{ url_for('remove_api_key') }}" style="display:inline;">
+                                    <input type="hidden" name="api_key" value="{{ key }}">
+                                    <button type="submit" class="btn-danger" title="删除API密钥"
+                                            onclick="return confirm('确定要删除这个API密钥吗？')">🗑️ 删除</button>
+                                </form>
+                                
+                                <!-- 启用/禁用按钮 -->
+                                <form method="POST" action="{{ url_for('toggle_key') }}" style="display:inline;">
+                                    <input type="hidden" name="api_key" value="{{ key }}">
+                                    {% if key in config.disabled_keys %}
+                                        <input type="hidden" name="action" value="enable">
+                                        <button type="submit" class="btn-success" title="重新启用API密钥">✅ 启用</button>
+                                    {% else %}
+                                        <input type="hidden" name="action" value="disable">
+                                        <button type="submit" class="btn-warning" title="手动禁用API密钥">⛔ 禁用</button>
+                                    {% endif %}
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="no-data">暂无API密钥</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- 代理管理 -->
+        <div class="section">
+            <h2>🌐 代理管理</h2>
+            
+            <!-- 添加代理 -->
+            <form method="POST" action="{{ url_for('add_proxy') }}">
+                <div class="form-group">
+                    <input type="text" name="proxy_url" placeholder="输入SOCKS5代理 (例如: socks5://127.0.0.1:1080)" required>
+                    <button type="submit">添加代理</button>
+                </div>
+            </form>
+            
+            <!-- 代理列表 -->
+            <div class="proxy-list">
+                <h3>当前代理列表</h3>
+                {% if config.proxies %}
+                    {% for proxy in config.proxies %}
+                        <div class="proxy-item">
+                            <span class="proxy-url">{{ proxy }}</span>
+                            <form method="POST" action="{{ url_for('remove_proxy') }}" style="display:inline;">
+                                <input type="hidden" name="proxy_url" value="{{ proxy }}">
+                                <button type="submit" class="btn-danger" 
+                                        onclick="return confirm('确定要删除这个代理吗？')">删除</button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="no-data">暂无代理配置</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- 代理映射 -->
+        <div class="section">
+            <h2>🔗 API密钥代理映射</h2>
+            {% if config.api_keys %}
+                <form method="POST" action="{{ url_for('set_key_proxy') }}">
+                    <div class="form-group">
+                        <select name="api_key" required>
+                            <option value="">选择API密钥</option>
+                            {% for key in config.api_keys %}
+                                <option value="{{ key }}" title="{{ key }}">{{ key[:20] }}...</option>
+                            {% endfor %}
+                        </select>
+                        
+                        <select name="proxy_url">
+                            <option value="">不使用代理</option>
+                            {% for proxy in config.proxies %}
+                                <option value="{{ proxy }}">{{ proxy }}</option>
+                            {% endfor %}
+                        </select>
+                        
+                        <button type="submit">设置映射</button>
+                    </div>
+                </form>
+                
+                <!-- 当前映射关系 -->
+                {% if config.key_proxy_mapping %}
+                    <div class="mapping-list">
+                        <h4>当前映射关系：</h4>
+                        {% for key, proxy in config.key_proxy_mapping.items() %}
+                            <div class="mapping-item">
+                                <span class="mapping-key" title="{{ key }}">{{ key[:20] }}...</span>
+                                <span class="mapping-arrow">→</span>
+                                <span class="mapping-proxy">{{ proxy }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% else %}
+                <p class="no-data">请先添加API密钥</p>
+            {% endif %}
+        </div>
+        
+        <!-- 使用说明 -->
+        <div class="section">
+            <h2>📖 使用说明</h2>
+            <div class="usage-info">
+                <h3>API调用方式：</h3>
+                <pre><code>curl "http://127.0.0.1/v1/chat/completions" \
+-H "Content-Type: application/json" \
+-H "Authorization: Bearer {{ config.access_key }}" \
+-d "{\"model\": \"gemini-2.5-flash-preview-05-20\", \"reasoning_effort\": \"low\", \"messages\": [{\"role\": \"user\", \"content\": \"Explain to me how AI works\"}]}"</code></pre>
+                
+                <h3>PowerShell调用方式：</h3>
+                <pre><code>$headers = @{
+    "Content-Type" = "application/json"
+    "Authorization" = "Bearer {{ config.access_key }}"
+}
+
+$body = @{
+    model = "gemini-2.5-flash-preview-05-20"
+    reasoning_effort = "low"
+    messages = @(
+        @{
+            role = "user"
+            content = "Explain to me how AI works"
+        }
+    )
+} | ConvertTo-Json -Depth 3
+
+Invoke-RestMethod -Uri "http://127.0.0.1/v1/chat/completions" -Method POST -Headers $headers -Body $body</code></pre>
+                
+                <h3>服务状态查询：</h3>
+                <p>访问 <code>http://127.0.0.1/status</code> 查看服务状态</p>
+                
+                <h3>功能说明：</h3>
+                <ul>
+                    <li>🔄 <strong>自动轮询：</strong> 系统会自动轮询使用可用的API密钥</li>
+                    <li>🛡️ <strong>自动禁用：</strong> 无效的API密钥会被自动检测并禁用</li>
+                    <li>🌐 <strong>代理支持：</strong> 支持为每个API密钥配置独立的SOCKS5代理</li>
+                    <li>🔧 <strong>实时管理：</strong> 所有配置更改立即生效，无需重启服务</li>
+                    <li>📊 <strong>统计监控：</strong> 实时查看每个API密钥的调用统计和成功率</li>
+                    <li>🔍 <strong>完整显示：</strong> 鼠标悬停在API密钥上可查看完整密钥</li>
+                    <li>🔐 <strong>安全认证：</strong> 管理面板需要密码认证，会话有效期1小时</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 日志和调试 -->
+        <div class="section">
+            <h2>🔍 调试信息</h2>
+            <div class="debug-info">
+                <p><strong>配置文件：</strong> config.json</p>
+                <p><strong>日志级别：</strong> INFO</p>
+                <p><strong>SOCKS支持：</strong> 
+                    <span id="socks-status">检查中...</span>
+                </p>
+                <p><strong>会话状态：</strong> 
+                    <span class="session-active">✅ 已认证</span>
+                </p>
+                <button onclick="checkStatus()" class="btn-info">刷新状态</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 悬浮提示框 -->
+    <div id="key-tooltip" class="key-tooltip"></div>
+
+    <script>
+        // 检查服务状态
+        function checkStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('socks-status').textContent = 
+                        data.socks_support ? '✅ 已启用' : '❌ 未启用';
+                    
+                    // 更新状态显示
+                    const totalCallsElement = document.getElementById('total-calls');
+                    const successRateElement = document.getElementById('success-rate');
+                    
+                    if (totalCallsElement) {
+                        totalCallsElement.textContent = data.total_calls;
+                    }
+                    if (successRateElement) {
+                        successRateElement.textContent = data.success_rate + '%';
+                    }
+                    
+                    // 更新其他状态项
+                    const statusItems = document.querySelectorAll('.status-value');
+                    if (statusItems.length >= 4) {
+                        statusItems[0].textContent = data.total_keys;
+                        statusItems[1].textContent = data.available_keys;
+                        statusItems[2].textContent = data.disabled_keys;
+                        statusItems[3].textContent = data.proxies;
+                    }
+                })
+                .catch(error => {
+                    console.error('获取状态失败:', error);
+                    document.getElementById('socks-status').textContent = '❌ 检查失败';
+                });
+        }
+        
+        // API密钥悬浮显示功能
+        function initKeyTooltip() {
+            const tooltip = document.getElementById('key-tooltip');
+            const keyTexts = document.querySelectorAll('.key-text[data-full-key]');
+            
+            keyTexts.forEach(keyText => {
+                keyText.addEventListener('mouseenter', function(e) {
+                    const fullKey = this.getAttribute('data-full-key');
+                    tooltip.textContent = fullKey;
+                    tooltip.style.display = 'block';
+                    tooltip.style.opacity = '1';
+                });
+                
+                keyText.addEventListener('mousemove', function(e) {
+                    tooltip.style.left = (e.pageX + 10) + 'px';
+                    tooltip.style.top = (e.pageY - 30) + 'px';
+                });
+                
+                keyText.addEventListener('mouseleave', function() {
+                    tooltip.style.opacity = '0';
+                    setTimeout(() => {
+                        tooltip.style.display = 'none';
+                    }, 200);
+                });
+            });
+        }
+        
+        // 复制API密钥功能
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                // 显示复制成功提示
+                const toast = document.createElement('div');
+                toast.className = 'copy-toast';
+                toast.textContent = '已复制到剪贴板';
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.remove();
+                }, 2000);
+            }).catch(function(err) {
+                console.error('复制失败:', err);
+            });
+        }
+        
+        // 为API密钥添加点击复制功能
+        function initCopyFeature() {
+            const keyTexts = document.querySelectorAll('.key-text[data-full-key]');
+            
+            keyTexts.forEach(keyText => {
+                keyText.style.cursor = 'pointer';
+                keyText.addEventListener('click', function() {
+                    const fullKey = this.getAttribute('data-full-key');
+                    copyToClipboard(fullKey);
+                });
+            });
+        }
+        
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            checkStatus();
+            initKeyTooltip();
+            initCopyFeature();
+            
+            // 每30秒自动刷新状态
+            setInterval(checkStatus, 30000);
+        });
+        
+        // 自动隐藏消息提示
+        document.addEventListener('DOMContentLoaded', function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    alert.style.opacity = '0';
+                    setTimeout(() => {
+                        alert.remove();
+                    }, 300);
+                }, 5000);
+            });
+        });
+    </script>
+</body>
+</html>
