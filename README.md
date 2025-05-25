@@ -48,6 +48,7 @@ python3 main.py
 
 ![image](https://github.com/user-attachments/assets/384f8b7c-b563-4dba-8b5b-8633ea81fac8)
 
+![image](https://github.com/user-attachments/assets/6509cfab-7093-4833-8219-9d7a04dbf114)
 
 ---
 
