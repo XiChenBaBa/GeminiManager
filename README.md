@@ -1,5 +1,3 @@
-下面是一个美化且完整的 **GitHub README**，使用Markdown格式：
-
 ````markdown
 # 🚀 Gemini API 管理器
 
