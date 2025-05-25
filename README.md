@@ -66,10 +66,5 @@ python3 main.py
 
 ---
 
-## 📄 开源许可
-
-本项目基于 [MIT License](LICENSE) 开源。
-
----
-
 > ⭐️ 如果觉得本项目对你有所帮助，欢迎给一个 Star 以示支持，谢谢！
+> 注：在main.py中修改运行IP以及端口。
